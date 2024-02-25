@@ -1,0 +1,17 @@
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\bin\Debug\net8.0\Ticket Sales.exe
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\bin\Debug\net8.0\Ticket Sales.deps.json
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\bin\Debug\net8.0\Ticket Sales.runtimeconfig.json
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\bin\Debug\net8.0\Ticket Sales.dll
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\bin\Debug\net8.0\Ticket Sales.pdb
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\bin\Debug\net8.0\RabbitMQ.Client.dll
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\obj\Debug\net8.0\Ticket Sales.csproj.AssemblyReference.cache
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\obj\Debug\net8.0\Ticket Sales.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\obj\Debug\net8.0\Ticket Sales.AssemblyInfoInputs.cache
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\obj\Debug\net8.0\Ticket Sales.AssemblyInfo.cs
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\obj\Debug\net8.0\Ticket Sales.csproj.CoreCompileInputs.cache
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\obj\Debug\net8.0\Ticket Sales.csproj.CopyComplete
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\obj\Debug\net8.0\Ticket Sales.dll
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\obj\Debug\net8.0\refint\Ticket Sales.dll
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\obj\Debug\net8.0\Ticket Sales.pdb
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\obj\Debug\net8.0\Ticket Sales.genruntimeconfig.cache
+C:\Users\artem\Documents\GitHub\Ticket Sales\Ticket Sales\obj\Debug\net8.0\ref\Ticket Sales.dll
