@@ -14,29 +14,38 @@ namespace Ticket_Sales
     internal class MQ_connector
     {
 
-        static public string exchangeName = "Efim-Test";
-        static public string queueName = "Efim";
-        static public string routingKey = "efim-test";
-        private IConnection GetRabbitConnection()
+        static string exchangeName = "Efim-Test";
+        static string queueName = "Efim";
+        static ConnectionFactory factory = new ConnectionFactory
         {
-            ConnectionFactory factory = new ConnectionFactory
-            {
-                UserName = "guest",
-                Password = "guest",
-                VirtualHost = "/",
-                HostName = "localhost"
-            };
-            try
-            {
-                IConnection conn = factory.CreateConnection();
-                return conn;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Ошибка создания подключения: " + ex.Message);
-                return null;
-            }
-        }
+            UserName = "guest",
+            Password = "guest",
+            VirtualHost = "/",
+            HostName = "localhost"
+        };
+        static IConnection conn = factory.CreateConnection();
+        static string routingKey = "efim-test";
+
+        //private IConnection GetRabbitConnection()
+        //{
+        //    ConnectionFactory factory = new ConnectionFactory
+        //    {
+        //        UserName = "guest",
+        //        Password = "guest",
+        //        VirtualHost = "/",
+        //        HostName = "localhost"
+        //    };
+        //    try
+        //    {
+        //        IConnection conn = factory.CreateConnection();
+        //        return conn;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Console.WriteLine("Ошибка создания подключения: " + ex.Message);
+        //        return null;
+        //    }
+        //}
 
         public void QueueListen()
         {
@@ -58,7 +67,6 @@ namespace Ticket_Sales
         public void CloseCon()
         {
             IModel model = GetRabbitChannel();
-            IConnection conn = GetRabbitConnection();
             if (model != null)
             {
                 model.Close();
@@ -72,7 +80,6 @@ namespace Ticket_Sales
 
         private IModel GetRabbitChannel()
         {
-            IConnection conn = GetRabbitConnection();
             if (conn != null)
             {
                 IModel model = conn.CreateModel();
@@ -102,23 +109,51 @@ namespace Ticket_Sales
             }
         }
 
-        public string ReceiveIndividualMessage()
+        public void ReceiveIndividualMessage()
         {
             string originalMessage = "";
             IModel model = GetRabbitChannel();
-            BasicGetResult result = model.BasicGet(queueName, false);
+            //BasicGetResult result = model.BasicAck(, false);
 
-            if (result == null)
+            //if (result == null)
+            //{
+            //    Console.WriteLine("Очередь пустая");
+            //}
+            //else
+            //{
+            //    byte[] body = result.Body.ToArray();
+            //    originalMessage = Encoding.UTF8.GetString(body);
+            //}
+            //return originalMessage;
+
+            using (model)
             {
-                Console.WriteLine("Очередь пустая");
-                model.QueuePurge(queueName);
+                model.QueueDeclare(queue: "task_queue",
+                                     durable: true,
+                                     exclusive: false,
+                                     autoDelete: false,
+                                     arguments: null);
+
+                model.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
+                model.ConfirmSelect();
+
+                Console.WriteLine(" [*] Waiting for messages.");
+
+                var consumer = new EventingBasicConsumer(model);
+                consumer.Received += (chanel, ea) =>
+                {
+                    var body = ea.Body;
+                    var message = Encoding.UTF8.GetString(body.ToArray());
+                    Console.WriteLine(" [x] Received {0}", message);
+
+                    model.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
+                    Console.WriteLine(" [x] Done");
+                };
+
+                Console.WriteLine(" Press [enter] to exit.");
+                Console.ReadLine();
             }
-            else
-            {
-                byte[] body = result.Body.ToArray();
-                originalMessage = Encoding.UTF8.GetString(body);
-            }
-            return originalMessage;
+
         }
     }
 }

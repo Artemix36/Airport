@@ -7,25 +7,9 @@ namespace Ticket_Sales
         static public void Main()
         {
             MQ_connector MQ = new MQ_connector();
-            while (true)
-            {
-                Console.WriteLine("Что вы хотите сделать?\n1 - Отправить сообщение\n2 - Прочитать сообщение\n3 - Выйти");
-                int n = 0;
-                int.TryParse(Console.ReadLine(), out n);
-                if(n==1)
-                {
-                    SendMsg(MQ);
-                }
-                if(n == 2)
-                {
-                    ReceiveIndividualMessage(MQ);
-                }
-                if(n == 3)
-                {
-                    break;
-                }
-            }
-            MQ.CloseCon();
+            Thread listener = new Thread(() => ReceiveIndividualMessage(MQ));
+            listener.Start();
+
         }
 
         static private void SendMsg(MQ_connector MQ)
@@ -45,7 +29,12 @@ namespace Ticket_Sales
         }
         static private void ReceiveIndividualMessage(MQ_connector MQ)
         {
-            Console.WriteLine(MQ.ReceiveIndividualMessage());
+            while (true)
+            {
+                Console.WriteLine("Thread started");
+                Thread.Sleep(1000);
+                MQ.ReceiveIndividualMessage();
+            }
         }
     }
 }
