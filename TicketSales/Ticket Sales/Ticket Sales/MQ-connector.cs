@@ -113,46 +113,18 @@ namespace Ticket_Sales
         {
             string originalMessage = "";
             IModel model = GetRabbitChannel();
-            //BasicGetResult result = model.BasicAck(, false);
+            BasicGetResult result = model.BasicGet(queueName, true);
 
-            //if (result == null)
-            //{
-            //    Console.WriteLine("Очередь пустая");
-            //}
-            //else
-            //{
-            //    byte[] body = result.Body.ToArray();
-            //    originalMessage = Encoding.UTF8.GetString(body);
-            //}
-            //return originalMessage;
-
-            using (model)
+            if (result == null)
             {
-                model.QueueDeclare(queue: "task_queue",
-                                     durable: true,
-                                     exclusive: false,
-                                     autoDelete: false,
-                                     arguments: null);
-
-                model.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
-                model.ConfirmSelect();
-
-                Console.WriteLine(" [*] Waiting for messages.");
-
-                var consumer = new EventingBasicConsumer(model);
-                consumer.Received += (chanel, ea) =>
-                {
-                    var body = ea.Body;
-                    var message = Encoding.UTF8.GetString(body.ToArray());
-                    Console.WriteLine(" [x] Received {0}", message);
-
-                    model.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
-                    Console.WriteLine(" [x] Done");
-                };
-
-                Console.WriteLine(" Press [enter] to exit.");
-                Console.ReadLine();
+                Console.WriteLine("Очередь пустая");
             }
+            else
+            {
+                byte[] body = result.Body.ToArray();
+                originalMessage = Encoding.UTF8.GetString(body);
+            }
+            Console.WriteLine(originalMessage);
 
         }
     }

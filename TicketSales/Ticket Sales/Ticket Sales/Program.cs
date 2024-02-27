@@ -29,10 +29,10 @@ namespace Ticket_Sales
         }
         static private void ReceiveIndividualMessage(MQ_connector MQ)
         {
+            Console.WriteLine("Listener thread started - it will check for new customer once in 5 seconds!");
             while (true)
             {
-                Console.WriteLine("Thread started");
-                Thread.Sleep(1000);
+                Thread.Sleep(5000);
                 MQ.ReceiveIndividualMessage();
             }
         }
