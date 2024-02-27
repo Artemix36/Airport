@@ -7,12 +7,16 @@ using System.Text;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
 
 namespace Ticket_Sales
 {
     internal class MQ_connector
     {
 
+        static public string exchangeName = "Efim-Test";
+        static public string queueName = "Efim";
+        static public string routingKey = "efim-test";
         private IConnection GetRabbitConnection()
         {
             ConnectionFactory factory = new ConnectionFactory
@@ -29,14 +33,31 @@ namespace Ticket_Sales
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                Console.WriteLine("Ошибка создания подключения: " + ex.Message);
                 return null;
             }
         }
 
-        public void CloseCon(string exchangeName, string queueName, string routingKey)
+        public void QueueListen()
         {
-            IModel model = GetRabbitChannel(exchangeName, queueName, routingKey);
+            Console.WriteLine("thread started");
+            IModel model = GetRabbitChannel();
+            model.QueueBind(queueName, exchangeName, routingKey);
+            var subscription = new EventingBasicConsumer(model);
+
+            while (true)
+            {
+                subscription.Received += (model, ea) =>
+                {
+                    var body = ea.Body.ToArray();
+                    var message = Encoding.UTF8.GetString(body);
+                    Console.WriteLine("Received: {0}", message);
+                };
+            }
+        }
+        public void CloseCon()
+        {
+            IModel model = GetRabbitChannel();
             IConnection conn = GetRabbitConnection();
             if (model != null)
             {
@@ -49,7 +70,7 @@ namespace Ticket_Sales
             Console.WriteLine("Соединение закрыто. See you, space cowboy!");
         }
 
-        private IModel GetRabbitChannel(string exchangeName, string queueName, string routingKey)
+        private IModel GetRabbitChannel()
         {
             IConnection conn = GetRabbitConnection();
             if (conn != null)
@@ -66,9 +87,9 @@ namespace Ticket_Sales
             }
         }
 
-        public void SendMessage(string exchangeName, string queueName, string routingKey, string message)
+        public void SendMessage(string message)
         {
-            IModel model = GetRabbitChannel(exchangeName, queueName, routingKey);
+            IModel model = GetRabbitChannel();
             if (model != null)
             {
                 byte[] messageBodyBytes = Encoding.UTF8.GetBytes(message);
@@ -81,10 +102,10 @@ namespace Ticket_Sales
             }
         }
 
-        public string ReceiveIndividualMessage(string exchangeName, string queueName, string routingKey)
+        public string ReceiveIndividualMessage()
         {
             string originalMessage = "";
-            IModel model = GetRabbitChannel(exchangeName, queueName, routingKey);
+            IModel model = GetRabbitChannel();
             BasicGetResult result = model.BasicGet(queueName, false);
 
             if (result == null)

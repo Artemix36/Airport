@@ -129,11 +129,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\artem\\Documents\\GitHub\\Ticket Sales\\Ticket Sales\\Ticket Sales.csproj",
+      "projectUniqueName": "C:\\Users\\artem\\Documents\\GitHub\\Airport\\TicketSales\\Ticket Sales\\Ticket Sales\\Ticket Sales.csproj",
       "projectName": "Ticket Sales",
-      "projectPath": "C:\\Users\\artem\\Documents\\GitHub\\Ticket Sales\\Ticket Sales\\Ticket Sales.csproj",
+      "projectPath": "C:\\Users\\artem\\Documents\\GitHub\\Airport\\TicketSales\\Ticket Sales\\Ticket Sales\\Ticket Sales.csproj",
       "packagesPath": "C:\\Users\\artem\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\artem\\Documents\\GitHub\\Ticket Sales\\Ticket Sales\\obj\\",
+      "outputPath": "C:\\Users\\artem\\Documents\\GitHub\\Airport\\TicketSales\\Ticket Sales\\Ticket Sales\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

@@ -25,7 +25,7 @@ namespace Ticket_Sales
                     break;
                 }
             }
-            MQ.CloseCon("Efim-Test", "Efim", "efim-test");
+            MQ.CloseCon();
         }
 
         static private void SendMsg(MQ_connector MQ)
@@ -35,7 +35,7 @@ namespace Ticket_Sales
 
             if (message != null || message.Length >= 0)
             {
-                MQ.SendMessage("Efim-Test", "Efim", "efim-test", message);
+                MQ.SendMessage(message);
             }
             else
             {
@@ -45,7 +45,7 @@ namespace Ticket_Sales
         }
         static private void ReceiveIndividualMessage(MQ_connector MQ)
         {
-            Console.WriteLine(MQ.ReceiveIndividualMessage("Efim-Test", "Efim", "efim-test"));
+            Console.WriteLine(MQ.ReceiveIndividualMessage());
         }
     }
 }

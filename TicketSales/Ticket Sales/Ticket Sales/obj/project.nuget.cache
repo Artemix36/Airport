@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "w2tZfy3p/GyOLdcLRPYoKW34Oom93Dw5I8SPn3ulbx5gd/efG8D7NJJsYhVA3NoRNPpu2xLgeKBEjkv7GMLhxQ==",
+  "dgSpecHash": "WUpikzweA+cRkPtppnodNGmTADkKtLWy3gb0yzTZ6ScETiNYNB58LoW54XRBONdMm0H2VGsGU4sPEjbSYnHKGA==",
   "success": true,
-  "projectFilePath": "C:\\Users\\artem\\Documents\\GitHub\\Ticket Sales\\Ticket Sales\\Ticket Sales.csproj",
+  "projectFilePath": "C:\\Users\\artem\\Documents\\GitHub\\Airport\\TicketSales\\Ticket Sales\\Ticket Sales\\Ticket Sales.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\artem\\.nuget\\packages\\rabbitmq.client\\6.8.1\\rabbitmq.client.6.8.1.nupkg.sha512",
     "C:\\Users\\artem\\.nuget\\packages\\system.memory\\4.5.5\\system.memory.4.5.5.nupkg.sha512",
