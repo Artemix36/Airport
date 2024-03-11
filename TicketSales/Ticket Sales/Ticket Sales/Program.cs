@@ -1,4 +1,5 @@
 ﻿using RabbitMQ.Client;
+using System.Threading.Tasks.Dataflow;
 
 namespace Ticket_Sales
 {
@@ -33,8 +34,37 @@ namespace Ticket_Sales
             while (true)
             {
                 Thread.Sleep(5000);
-                MQ.ReceiveIndividualMessage();
+                string message = MQ.ReceiveIndividualMessage();
+
+                if (message != null)
+                {
+                    string[] info_passenger = Parcer(message);
+                    string passenger_GUID = get_INFO("passenger", info_passenger);
+                    string flight_GUID = get_INFO("flight", info_passenger);
+                    string baggage = get_INFO("baggage", info_passenger);
+                    string food = get_INFO("food", info_passenger);
+                    Console.WriteLine($"Passenger - {passenger_GUID}\nFlight - {flight_GUID}\nBaggage - {baggage}\nPreffered food - {food}");
+                }
             }
+        }
+
+        private static string get_INFO(string name, string[] info_passenger)
+        {
+           for(int i = 0; i< info_passenger.Length; i++)
+            {
+                if (info_passenger[i].ToLower().Contains(name.ToLower()))
+                {
+                    return info_passenger[i].Split(':')[1];
+                }
+            }
+            return null;
+        }
+
+        static string[] Parcer(string message)
+        {
+            message = message.Trim('\n');
+            string[] info_passenger = message.Split(';');
+            return info_passenger;
         }
     }
 }

@@ -109,7 +109,7 @@ namespace Ticket_Sales
             }
         }
 
-        public void ReceiveIndividualMessage()
+        public string ReceiveIndividualMessage()
         {
             string originalMessage = "";
             IModel model = GetRabbitChannel();
@@ -118,11 +118,13 @@ namespace Ticket_Sales
             if (result == null)
             {
                 Console.WriteLine("Очередь пустая");
+                return null;
             }
             else
             {
                 byte[] body = result.Body.ToArray();
                 originalMessage = Encoding.UTF8.GetString(body);
+                return originalMessage;
             }
             Console.WriteLine(originalMessage);
 

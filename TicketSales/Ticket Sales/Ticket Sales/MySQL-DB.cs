@@ -8,5 +8,7 @@ namespace Ticket_Sales
 {
     internal class MySQL_DB
     {
+
     }
+
 }
