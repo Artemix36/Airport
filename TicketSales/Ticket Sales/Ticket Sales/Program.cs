@@ -5,12 +5,12 @@ namespace Ticket_Sales
 {
     internal class MQ
     {
+        static int seconds = 5000;
         static public void Main()
         {
             MQ_connector MQ = new MQ_connector();
             Thread listener = new Thread(() => ReceiveIndividualMessage(MQ));
             listener.Start();
-
         }
 
         static private void SendMsg(MQ_connector MQ)
@@ -30,20 +30,23 @@ namespace Ticket_Sales
         }
         static private void ReceiveIndividualMessage(MQ_connector MQ)
         {
-            Console.WriteLine("Listener thread started - it will check for new customer once in 5 seconds!");
+            Console.WriteLine($"Listener thread started - it will check for new customer once in {seconds} ms!");
             while (true)
             {
-                Thread.Sleep(5000);
+                Thread.Sleep(seconds);
                 string message = MQ.ReceiveIndividualMessage();
 
                 if (message != null)
                 {
                     string[] info_passenger = Parcer(message);
                     string passenger_GUID = get_INFO("passenger", info_passenger);
+                    Console.WriteLine($"Обработано обращение от {passenger_GUID}");
                     string flight_GUID = get_INFO("flight", info_passenger);
                     string baggage = get_INFO("baggage", info_passenger);
                     string food = get_INFO("food", info_passenger);
-                    Console.WriteLine($"Passenger - {passenger_GUID}\nFlight - {flight_GUID}\nBaggage - {baggage}\nPreffered food - {food}");
+                    MySQL_DB DB_conn = new MySQL_DB();
+                    bool can_seat = DB_conn.CheckSeats(passenger_GUID, flight_GUID);
+
                 }
             }
         }

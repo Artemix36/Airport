@@ -16,7 +16,7 @@ namespace Ticket_Sales
 
         static string exchangeName = "PassengersExchange";
         static string ReadQueueName = "TicketsRequest";
-        static string WriteQueuName = "TicketsResponse";
+        static string WriteQueueName = "TicketsResponse";
 
         static ConnectionFactory factory = new ConnectionFactory
         {
@@ -32,8 +32,8 @@ namespace Ticket_Sales
         public void QueueListen()
         {
             Console.WriteLine("thread started");
-            IModel model = GetRabbitChannel();
-            model.QueueBind(ReadQueueName, exchangeName, routingKey);
+            IModel model = GetRabbitChannel(ReadQueueName);
+            model.QueueBind(ReadQueueName, exchangeName, ReadQueueName+"Key");
             var subscription = new EventingBasicConsumer(model);
 
             while (true)
@@ -46,9 +46,9 @@ namespace Ticket_Sales
                 };
             }
         }
-        public void CloseCon()
+        public void CloseCon(string queue)
         {
-            IModel model = GetRabbitChannel();
+            IModel model = GetRabbitChannel(queue);
             if (model != null)
             {
                 model.Close();
@@ -60,14 +60,14 @@ namespace Ticket_Sales
             Console.WriteLine("Соединение закрыто. See you, space cowboy!");
         }
 
-        private IModel GetRabbitChannel()
+        private IModel GetRabbitChannel(string queue)
         {
             if (conn != null)
             {
                 IModel model = conn.CreateModel();
                 model.ExchangeDeclare(exchangeName, ExchangeType.Direct);
-                model.QueueDeclare(ReadQueueName, false, false, false, null);
-                model.QueueBind(ReadQueueName, exchangeName, routingKey, null);
+                model.QueueDeclare(queue, false, false, false, null);
+                model.QueueBind(queue, exchangeName, queue+"Key", null);
                 return model;
             }
             else
@@ -78,11 +78,11 @@ namespace Ticket_Sales
 
         public void SendMessage(string message)
         {
-            IModel model = GetRabbitChannel();
+            IModel model = GetRabbitChannel(WriteQueueName);
             if (model != null)
             {
                 byte[] messageBodyBytes = Encoding.UTF8.GetBytes(message);
-                model.BasicPublish(exchangeName, routingKey, null, messageBodyBytes);
+                model.BasicPublish(exchangeName, WriteQueueName+"Key", null, messageBodyBytes);
                 Console.WriteLine("Положено в очередь");
             }
             else
@@ -94,12 +94,11 @@ namespace Ticket_Sales
         public string ReceiveIndividualMessage()
         {
             string originalMessage = "";
-            IModel model = GetRabbitChannel();
+            IModel model = GetRabbitChannel(ReadQueueName);
             BasicGetResult result = model.BasicGet(ReadQueueName, true);
 
             if (result == null)
             {
-                Console.WriteLine("Очередь пустая");
                 return null;
             }
             else

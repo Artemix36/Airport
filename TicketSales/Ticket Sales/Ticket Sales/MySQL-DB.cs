@@ -8,7 +8,10 @@ namespace Ticket_Sales
 {
     internal class MySQL_DB
     {
-
+        internal bool CheckSeats(string passenger_GUID, string flight_GUID)
+        {
+            return false;
+        }
     }
 
 }
