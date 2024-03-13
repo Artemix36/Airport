@@ -14,44 +14,26 @@ namespace Ticket_Sales
     internal class MQ_connector
     {
 
-        static string exchangeName = "Efim-Test";
-        static string queueName = "Efim";
+        static string exchangeName = "PassengersExchange";
+        static string ReadQueueName = "TicketsRequest";
+        static string WriteQueuName = "TicketsResponse";
+
         static ConnectionFactory factory = new ConnectionFactory
         {
-            UserName = "guest",
-            Password = "guest",
-            VirtualHost = "/",
-            HostName = "localhost"
+            VirtualHost = "itojxdln",
+            HostName = "hawk-01.rmq.cloudamqp.com",
+            Password = "DEL8js4Cg76jY_2lAt19CjfY2saZT0yW",
+            UserName = "itojxdln",
+            ClientProvidedName = "Passenger Generator"
         };
         static IConnection conn = factory.CreateConnection();
-        static string routingKey = "efim-test";
-
-        //private IConnection GetRabbitConnection()
-        //{
-        //    ConnectionFactory factory = new ConnectionFactory
-        //    {
-        //        UserName = "guest",
-        //        Password = "guest",
-        //        VirtualHost = "/",
-        //        HostName = "localhost"
-        //    };
-        //    try
-        //    {
-        //        IConnection conn = factory.CreateConnection();
-        //        return conn;
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Console.WriteLine("Ошибка создания подключения: " + ex.Message);
-        //        return null;
-        //    }
-        //}
+        static string routingKey = "passengers-routing-key";
 
         public void QueueListen()
         {
             Console.WriteLine("thread started");
             IModel model = GetRabbitChannel();
-            model.QueueBind(queueName, exchangeName, routingKey);
+            model.QueueBind(ReadQueueName, exchangeName, routingKey);
             var subscription = new EventingBasicConsumer(model);
 
             while (true)
@@ -84,8 +66,8 @@ namespace Ticket_Sales
             {
                 IModel model = conn.CreateModel();
                 model.ExchangeDeclare(exchangeName, ExchangeType.Direct);
-                model.QueueDeclare(queueName, false, false, false, null);
-                model.QueueBind(queueName, exchangeName, routingKey, null);
+                model.QueueDeclare(ReadQueueName, false, false, false, null);
+                model.QueueBind(ReadQueueName, exchangeName, routingKey, null);
                 return model;
             }
             else
@@ -113,7 +95,7 @@ namespace Ticket_Sales
         {
             string originalMessage = "";
             IModel model = GetRabbitChannel();
-            BasicGetResult result = model.BasicGet(queueName, true);
+            BasicGetResult result = model.BasicGet(ReadQueueName, true);
 
             if (result == null)
             {
@@ -126,8 +108,6 @@ namespace Ticket_Sales
                 originalMessage = Encoding.UTF8.GetString(body);
                 return originalMessage;
             }
-            Console.WriteLine(originalMessage);
-
         }
     }
 }
