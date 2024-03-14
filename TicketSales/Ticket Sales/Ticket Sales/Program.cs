@@ -8,7 +8,9 @@ namespace Ticket_Sales
         static int seconds = 5000;
         static public void Main()
         {
+            MySQL_DB db = new MySQL_DB();
             MQ_connector MQ = new MQ_connector();
+            db.FillSeats();
             Thread listener = new Thread(() => ReceiveIndividualMessage(MQ));
             listener.Start();
         }
@@ -40,13 +42,23 @@ namespace Ticket_Sales
                 {
                     string[] info_passenger = Parcer(message);
                     string passenger_GUID = get_INFO("passenger", info_passenger);
-                    Console.WriteLine($"Обработано обращение от {passenger_GUID}");
                     string flight_GUID = get_INFO("flight", info_passenger);
                     string baggage = get_INFO("baggage", info_passenger);
                     string food = get_INFO("food", info_passenger);
-                    MySQL_DB DB_conn = new MySQL_DB();
-                    bool can_seat = DB_conn.CheckSeats(passenger_GUID, flight_GUID);
 
+                    MySQL_DB DB_conn = new MySQL_DB();
+                    bool can_seat = DB_conn.CheckSeats(flight_GUID);
+
+                    if(can_seat)
+                    {
+                        MQ.SendMessage($"Passenger:{passenger_GUID};Flight:{flight_GUID}Ticket:yes;");
+                    }
+                    else
+                    {
+                        MQ.SendMessage($"Passenger:{passenger_GUID};Ticket:no");
+                    }
+
+                    Console.WriteLine($"Обработано обращение от {passenger_GUID}. Билет: {can_seat}");
                 }
             }
         }

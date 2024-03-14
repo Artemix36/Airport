@@ -83,7 +83,6 @@ namespace Ticket_Sales
             {
                 byte[] messageBodyBytes = Encoding.UTF8.GetBytes(message);
                 model.BasicPublish(exchangeName, WriteQueueName+"Key", null, messageBodyBytes);
-                Console.WriteLine("Положено в очередь");
             }
             else
             {
