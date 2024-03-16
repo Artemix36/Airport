@@ -124,8 +124,10 @@ namespace Ticket_Sales
 
                 if(free_seets > 0)
                 {
-                    MySqlCommand cmd2 = new MySqlCommand($"UPDATE `Flights` SET `FREE_SEATS` = {free_seets-1} WHERE `FLIGHT_GUID` = {flight_GUID}", db.GetConnection());
-                    db.OpenConnect();
+                    MySqlCommand cmd2 = new MySqlCommand($"UPDATE `Flights` SET `FREE_SEATS` = @n WHERE `FLIGHT_GUID` = @a", db.GetConnection());
+                    cmd2.Parameters.Add("@n", MySqlDbType.VarChar).Value = free_seets-1;
+                    cmd2.Parameters.Add("@a", MySqlDbType.VarChar).Value = flight_GUID;
+                db.OpenConnect();
                     cmd2.ExecuteNonQuery();
                     db.CloseConnect();
                     return true;
@@ -145,24 +147,33 @@ namespace Ticket_Sales
             return info_passenger;
         }
 
-        private static void get_INFO(string name, string[] info_passenger)
+        public static void get_INFO(string name, string[] info_passenger)
         {
-            Dictionary<string, string> dict = null;
             MySQL_DB db = new MySQL_DB();
+            db.OpenConnect();
+            //MySqlCommand cmd = new MySqlCommand($"INSERT INTO `Flights` (`FLIGHT_GUID`, `FREE_SEATS`) VALUES(@n, @a)", db.GetConnection());
+            //cmd.Parameters.Add("@n", MySqlDbType.VarChar).Value = info_passenger[0].Split(':')[2].Trim('"');
+            //cmd.Parameters.Add("@a", MySqlDbType.VarChar).Value = info_passenger[8].Split(':')[1].Trim('"', '}');
+            //cmd.ExecuteNonQuery();
+
             for (int i = 0; i < info_passenger.Length; i++)
             {
-                Console.WriteLine(info_passenger[i] + " "+info_passenger.Length);
                 if (info_passenger[i].ToLower().Contains("id") && info_passenger[i + 8].ToLower().Contains("airplane_capacity"))
                 {
-                    MySqlCommand cmd2 = new MySqlCommand($"INSERT INTO `Flights` (`FLIGHT_GUID`, `FREE_SEATS`) VALUES(@n, @n)");
-
-                    cmd2.Parameters.Add("@n", MySqlDbType.VarChar).Value = info_passenger[i].Split(':')[2].Trim('"');
-                    cmd2.Parameters.Add("@a", MySqlDbType.VarChar).Value = info_passenger[i + 8].Split(':')[1].Trim('"', '}');
-                    db.OpenConnect();
-                    cmd2.ExecuteNonQuery();
-                    db.CloseConnect();
-                }
+                    try
+                    {
+                        MySqlCommand cmd2 = new MySqlCommand($"INSERT INTO `Flights` (`FLIGHT_GUID`, `FREE_SEATS`) VALUES(@n, @a)", db.GetConnection());
+                        cmd2.Parameters.Add("@n", MySqlDbType.VarChar).Value = info_passenger[i].Split(':')[1].Trim('"');
+                        cmd2.Parameters.Add("@a", MySqlDbType.VarChar).Value = info_passenger[i + 8].Split(':')[1].Trim('"', '}');
+                        cmd2.ExecuteNonQuery();
+                    }
+                    catch (Exception ex) 
+                    {
+                        Console.WriteLine("ERROR: "+ex.Message);
+                    }
+                    }
             }
+            db.CloseConnect();
         }
 
     }

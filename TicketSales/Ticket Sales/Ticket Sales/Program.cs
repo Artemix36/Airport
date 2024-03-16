@@ -1,4 +1,5 @@
 ﻿using RabbitMQ.Client;
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 
 namespace Ticket_Sales
@@ -33,6 +34,7 @@ namespace Ticket_Sales
         static private void ReceiveIndividualMessage(MQ_connector MQ)
         {
             Console.WriteLine($"Listener thread started - it will check for new customer once in {seconds} ms!");
+            MySQL_DB DB_conn = new MySQL_DB();
             while (true)
             {
                 Thread.Sleep(seconds);
@@ -40,25 +42,33 @@ namespace Ticket_Sales
 
                 if (message != null)
                 {
-                    string[] info_passenger = Parcer(message);
-                    string passenger_GUID = get_INFO("passenger", info_passenger);
-                    string flight_GUID = get_INFO("flight", info_passenger);
-                    string baggage = get_INFO("baggage", info_passenger);
-                    string food = get_INFO("food", info_passenger);
-
-                    MySQL_DB DB_conn = new MySQL_DB();
-                    bool can_seat = DB_conn.CheckSeats(flight_GUID);
-
-                    if(can_seat)
+                    if (message == "update filghts")
                     {
-                        MQ.SendMessage($"Passenger:{passenger_GUID};Flight:{flight_GUID}Ticket:yes;");
+                        Console.WriteLine("Обновляю рейсы");
+                        DB_conn.FillSeats();
                     }
                     else
                     {
-                        MQ.SendMessage($"Passenger:{passenger_GUID};Ticket:no");
-                    }
+                        string[] info_passenger = Parcer(message);
+                        string passenger_GUID;
+                        string flight_GUID;
 
-                    Console.WriteLine($"Обработано обращение от {passenger_GUID}. Билет: {can_seat}");
+                        using (JsonDocument jsonDoc = ParseMessage(message))
+                        {
+                            JsonElement data = jsonDoc.RootElement;
+                            flight_GUID = data.GetProperty("Flight").ToString();
+                            passenger_GUID = data.GetProperty("Passenger").ToString();
+                        }
+
+                        bool can_seat = DB_conn.CheckSeats(flight_GUID);
+
+                        if (can_seat)
+                        {
+                            MQ.SendMessage($"Passenger:{passenger_GUID};Flight:{flight_GUID}Ticket:yes;");
+                        }
+
+                        Console.WriteLine($"Обработано обращение от {passenger_GUID}. Билет: {can_seat}");
+                    }
                 }
             }
         }
@@ -73,6 +83,10 @@ namespace Ticket_Sales
                 }
             }
             return null;
+        }
+        static public JsonDocument ParseMessage(string json)
+        {
+            return JsonDocument.Parse(json);
         }
 
         static string[] Parcer(string message)
