@@ -46,7 +46,7 @@ namespace Ticket_Sales
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine($"{e.Message}");
+                    Console.WriteLine($"PROBLEM: {e.Message}");
                 }
             }
 
@@ -73,7 +73,7 @@ namespace Ticket_Sales
                 {
                     string result = response.Content.ReadAsStringAsync().Result;
                     string[] flight_info = result.Split(',');
-                    Console.WriteLine(get_INFO("id", flight_info));
+                    get_INFO("id", flight_info);
                 }
                 else
                 {
@@ -145,16 +145,24 @@ namespace Ticket_Sales
             return info_passenger;
         }
 
-        private static string get_INFO(string name, string[] info_passenger)
+        private static void get_INFO(string name, string[] info_passenger)
         {
+            Dictionary<string, string> dict = null;
+            MySQL_DB db = new MySQL_DB();
             for (int i = 0; i < info_passenger.Length; i++)
             {
-                if (info_passenger[i].ToLower().Contains(name.ToLower()))
+                Console.WriteLine(info_passenger[i] + " "+info_passenger.Length);
+                if (info_passenger[i].ToLower().Contains("id") && info_passenger[i + 8].ToLower().Contains("airplane_capacity"))
                 {
-                    return info_passenger[i].Split(':')[1];
+                    MySqlCommand cmd2 = new MySqlCommand($"INSERT INTO `Flights` (`FLIGHT_GUID`, `FREE_SEATS`) VALUES(@n, @n)");
+
+                    cmd2.Parameters.Add("@n", MySqlDbType.VarChar).Value = info_passenger[i].Split(':')[2].Trim('"');
+                    cmd2.Parameters.Add("@a", MySqlDbType.VarChar).Value = info_passenger[i + 8].Split(':')[1].Trim('"', '}');
+                    db.OpenConnect();
+                    cmd2.ExecuteNonQuery();
+                    db.CloseConnect();
                 }
             }
-            return null;
         }
 
     }
