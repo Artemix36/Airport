@@ -161,7 +161,7 @@ function showRoads() {
     console.log("Дорога 7: ", road_7);
     console.log("Дорога 8: ", road_8);
 }
-// showRoads();
+showRoads();
 
 module.exports = {
     spawnRow, spawnCol,
