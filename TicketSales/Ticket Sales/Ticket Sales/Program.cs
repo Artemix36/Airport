@@ -33,6 +33,7 @@ namespace Ticket_Sales
         }
         static private void ReceiveIndividualMessage(MQ_connector MQ)
         {
+            Console.WriteLine("\"passenger\"");
             Console.WriteLine($"Listener thread started - it will check for new customer once in {seconds} ms!");
             MySQL_DB DB_conn = new MySQL_DB();
             while (true)
@@ -64,7 +65,7 @@ namespace Ticket_Sales
 
                         if (can_seat)
                         {
-                            MQ.SendMessage($"Passenger:{passenger_GUID};Flight:{flight_GUID}Ticket:yes;");
+                            MQ.SendMessage($"{{\r\n\"passenger\":{passenger_GUID},\r\n\"flight\":{flight_GUID}\r\n}}");
                         }
 
                         Console.WriteLine($"Обработано обращение от {passenger_GUID}. Билет: {can_seat}");
