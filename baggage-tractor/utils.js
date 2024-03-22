@@ -1,152 +1,162 @@
 // TODO: бэкап в SQLite ?
+// TODO: JSON-заголовки в GET и POST-запросах?
+// TODO: Ограничение на кол-во машинок?
 
 const axios = require('axios');
 const carRoutes = require('./carRoute');
 const MD5 = require('crypto-js/md5');
-const { response } = require('express');
 
-const dispatcherURL = 'http://localhost:9008';  // Ресурс Диспетчера
-const HSURL = 'http://localhost:9004';          // Ресурс УНО
-const planeURL = 'http://localhost:9008';       // Ресурс Борта
-// const visualizerURL = 'http://localhost:9010';  // Ресурс визуализатора
+const serverAddr = 'http://46.174.48.185';
+const HSURL = `${serverAddr}:9004`;
+const groundControlURL = `${serverAddr}:9007`;
+const planeURL = `${serverAddr}:9008`;
 
-const POST_Headers = {
-  'Content-Type': 'application/json',
-  'Accept': 'application/json'
-};
+// Заголовки для POST-запросов (не уверен, что нужно)
+// const POST_Headers = {
+//   'Content-Type': 'application/json',
+//   'Accept': 'application/json'
+// };
 
 // Список машинок
 let luggageCars = [];
 
-// Список багажей в багажном терминале
-// TODO: Согласовать с Архипом свойства багажа
+// Список сумочек в багажном терминале
 let luggageTerminal = [];
 
-// Задержка в мс
-let eventTimeout = 1000;
-
-// Нахождение индекса машинки, у которой поданный UID
-async function findIndexWithKey(key) {
-    return luggageCars.map(car => { return car.id; }).indexOf(key);
-}
+// Задержка в мс (движение машинки)
+let moveTimeout = 300;
+let luggageTimeout = 1000;
 
 // Добавление новой машинки в систему
-function spawnNewCar() {
-    if (luggageCars.length < 4) {
-        const newCar = {
-            id: MD5(Math.random().toString()).toString(),
-            position: {
-                row: carRoutes.spawnRow,
-                col: carRoutes.spawnCol
-            },
-            home: {
-                row: carRoutes.spawnRow,
-                col: carRoutes.spawnCol
-            },
-            direction: "up",
-            status: "ready",
-            job: {
-                plane_id: null,
-                plane_row: null,
-                plane_col: null,
-            },
-            luggage: []
-        };
-        luggageCars.push(newCar);
-        carRoutes.spawnCol++;
-        console.log(`${new Date()} В Baggage Tractor добавлена новая машинка с id ${newCar.id}`);
-    } else {
-        console.error(`${new Date()} Baggage Tractor не может добавить новую машинку в систему, т.к. лимит - 4!`);
-    }
+// TODO: если сразу заспавнить 2 машинки в одном месте, то будет ошибка...
+async function spawnNewCar() {
+    console.log(`Для Ground Control послано сообщение о появлении новой машинки на карте`);
+    await axios.post(`${groundControlURL}/v1/map/at/${carRoutes.spawnRow}/${carRoutes.spawnCol}/1`, "")
+        .then(async (response) => {
+            if (response.data.success === true) {
+                const newCar = {
+                    id: MD5(Math.random().toString()).toString(),
+                    position: {
+                        row: carRoutes.spawnRow,
+                        col: carRoutes.spawnCol
+                    },
+                    // direction: "up",
+                    status: "ready",
+                    job: {
+                        plane_id: null,
+                        plane_row: null,
+                        plane_col: null,
+                        job_type: null,
+                        takeoff_flight_id: null
+                    },
+                    luggage: []
+                };
+                luggageCars.push(newCar);
+                console.log(`Ground Control успешно получил сообщение о появлении новой машинки ${newCar.id} на ${carRoutes.spawnRow}, ${carRoutes.spawnCol}`);
+            } else {
+                console.log(`Во время сообщения Ground Control о появлении новой машинки на ${carRoutes.spawnRow}, ${carRoutes.spawnCol} возникла ошибка: `, response.data);
+            }
+        })
+        .catch((error) => {
+            console.error(`Во время сообщения Ground Control о появлении новой машинки на ${carRoutes.spawnRow}, ${carRoutes.spawnCol} возникла ошибка: `, error);
+        });
 }
 
-// TODO: это вряд ли нужно
-// Если рядом с поданной машинкой есть другая моя машинка
-// function thereAreMyCarsNearTheCar(car) {
-//     return luggageCars.some(other_car => {
-//        return (Math.abs(car.position.row - other_car.position.row === 1) || Math.abs(car.position.col - other_car.position.col === 1));
-//     });
-// }
+// Освобождение машинки от работы
+async function freeCar(car) {
+    // Стирание машинки
+    await axios.post(`${groundControlURL}/v1/map/at/${car.position.row}/${car.position.col}/0`, "")
+        .then(response => {
+            if (response.data.success === true) {
+                console.log(`Ground Control успешно удалил машинку ${car.id} с карты`);
+                luggageCars.splice(luggageCars.indexOf(car), 1);
+            } else {
+                console.log(`Ground Control не смог удалить машинку ${car.id} с карты`);
+            }
+        })
+        .catch(error => {
+            console.log(`Во время сообщения Ground Control об удалении машинки ${car.id} с ${car.position.row}, ${car.position.col} возникла ошибка: `, error);
+        });
+}
 
 // Подфункция для перемещения машинки на заданную координату
 async function moveCar(car, targetRow, targetCol) {
-    console.log(`Baggage Tractor сообщает в диспетчерскую о перемещении машинки ${car.id} на ${targetRow}, ${targetCol}.`);
-    setTimeout(async () => {
-        await axios.post(`${dispatcherURL}/v1/map/move/${car.position.row}/${car.position.col}/${targetRow}/${targetCol}`, {}, {POST_Headers})
-            .then((response) => {
-                // Здесь меняю направление машинки
-                if (targetRow !== car.position.row)
-                    (car.position.row < targetRow) ? car.direction = 'down' : car.direction = 'up';
-                else if (targetCol !== car.position.col)
-                    (car.position.col < targetCol) ? car.direction = 'right' : car.direction = 'left';
 
+    // Здесь меняю направление машинки
+    // if (targetRow !== car.position.row)
+    //     (car.position.row < targetRow) ? car.direction = 'down' : car.direction = 'up';
+    // else if (targetCol !== car.position.col)
+    //     (car.position.col < targetCol) ? car.direction = 'right' : car.direction = 'left';
+    console.log(`Машинка ${car.id} сообщает в Ground Control о перемещении с ${car.position.row}, ${car.position.col} на ${targetRow}, ${targetCol}.`);
+    await axios.post(`${groundControlURL}/v1/map/move/${car.position.row}/${car.position.col}/${targetRow}/${targetCol}`, "")
+        .then((response) => {
+            if (response.data.success === true) {
+                console.log(`Машинка ${car.id} успешно перемещена на клетку ${targetRow}, ${targetCol}.`);
                 car.position.row = targetRow;
                 car.position.col = targetCol;
-                console.log(`${new Date()} Baggage Tractor переместил машинку ${car.id} на клетку ${targetRow}, ${targetCol}.`);
-            })
-            .catch(err => {
-                console.log(`${new Date()} В процессе перемещения машинки ${car.id} на на клетку ${targetRow}, ${targetCol} возникла ошибка!`);
-            });
-    }, eventTimeout);
+            } else {
+                console.log(`Во время сообщения Ground Control о перемещении машинки на ${targetRow}, ${targetCol} возникла ошибка: `, response.data);
+            }
+        })
+        .catch(err => {
+            console.error(`В процессе перемещения машинки ${car.id} на на клетку ${targetRow}, ${targetCol} возникла ошибка`);
+        });
 }
 
 // Подфункция для попытки безопасного перемещения на заданную координату
 async function tryToMoveCar(car, targetRow, targetCol) {
-    console.log(`${new Date()} Baggage Tractor спрашивает у диспетчера разрешение на перемещение машинки ${car.id} на ${targetRow}, ${targetCol}.`);
-    await axios.get(`${dispatcherURL}/v1/map/at/${targetRow}/${targetCol}`, { headers: { 'Accept': 'application/json' } })
+    console.log(`Запрос разрешения у Ground Control на перемещение машинки ${car.id} на ${targetRow}, ${targetCol}.`);
+    await axios.get(`${groundControlURL}/v1/map/at/${targetRow}/${targetCol}`, { headers: { 'Accept': 'application/json' } })
         .then(async (response) => {
-            console.log(`${new Date()} Debug (dispatcher GET-request): `, response.data);
-            // Если клетка не занята
-            if (response.data.state === "0") {
-                await moveCar(car, targetRow, targetCol);
-            } else {
-                console.log(`${new Date()} Baggage Tractor попытался переместиться машинку ${car.id} на клетку ${targetRow}, ${targetCol}, но диспетчер не разрешил. Микросервис попробует ещё раз после 1 секунды.`);
-                // Новый запрос выполняется рекурсивно
-                setTimeout(async () => {
+            if (response.data.success === true) {
+                // Если клетка не занята
+                if (response.data.state === "0") {
+                    await moveCar(car, targetRow, targetCol);
+                } else {
+                    console.log(`Машинка ${car.id} желала переместиться на клетку ${targetRow}, ${targetCol}, но Ground Control не разрешил. После 1 секунды будет следующая попытка.`);
+                    // Новый запрос выполняется рекурсивно ??????????????????????
                     await tryToMoveCar(car, targetRow, targetCol);
-                }, 1000);
+                }
+            } else {
+                console.log(`Во время запроса у Ground Control о состоянии клетки ${targetRow}, ${targetCol} возникла ошибка: `, response.data);
             }
         })
         .catch(err => {
-           console.log(`${new Date()} В процессе перемещения машинки ${car.id} на на клетку ${targetRow}, ${targetCol} возникла ошибка!`);
+            console.error(`В процессе перемещения машинки ${car.id} на на клетку ${targetRow}, ${targetCol} возникла ошибка: `, err);
         });
 }
 
-// Прогнать машинку по маршруту
-async function moveCarThroughRoute(car, route) {
+// Прогнать машинку по клеточкам до точки
+async function moveCarToPoint(car, targetRow, targetCol) {
 
-    await route.forEach(async (coordinate) => {
-        // Если клетка "не критическая", т.е. не пересекается с чужими дорогами
-        if (coordinate[2]) {
-            // Тем не менее, здесь стоит сделать проверку на проезжающую рядом мою машинку
-            // if (!(thereAreMyCarsNearTheCar(car))) {
-            await moveCar(car, coordinate[0], coordinate[1]);
-            // else console.log(`${getTimestamp()} Baggage Tractor не переместил машинку ${car.id} на клетку ${coordinate[0]}, ${coordinate[1]}, т.к. рядом проезжают другие машинки этого же сервиса.`);
-        } else {
-            await tryToMoveCar(car, coordinate[0], coordinate[1]);
-        }
-    });
-}
-
-// Прогнать машинку до точки (без маршрута), с проверкой на каждом ходу
-async function moveCarToPointUnrouted(car, targetRow, targetCol) {
     let rowStep; let colStep;
     car.position.row < targetRow ? rowStep = 1 : rowStep = -1;
     car.position.col < targetCol ? colStep = 1 : colStep = -1;
 
     // Сначала машинка едет до нужной строки, потом до нужного столбца
     while (car.position.row !== targetRow) {
-        // await tryToMoveCar(car, car.position.row + rowStep, car.position.col);
-        await moveCar(car, car.position.row + rowStep, car.position.col);
+        const nextRow = car.position.row + rowStep;
+        const nextCol = car.position.col;
+        await new Promise(resolve => setTimeout(resolve, moveTimeout));
+        if (carRoutes.criticalCells.includes([nextRow, nextCol]))
+            await tryToMoveCar(car, nextRow, nextCol);
+        else
+            await moveCar(car, nextRow, nextCol);
     }
     while (car.position.col !== targetCol) {
-        // await tryToMoveCar(car, car.position.row, car.position.col + colStep);
-        await moveCar(car, car.position.row, car.position.col + colStep);
+        const nextRow = car.position.row;
+        const nextCol = car.position.col + colStep;
+        await new Promise(resolve => setTimeout(resolve, moveTimeout));
+        if (carRoutes.criticalCells.includes([nextRow, nextCol]))
+            await tryToMoveCar(car, nextRow, nextCol);
+        else
+            await moveCar(car, nextRow, nextCol);
     }
 }
 
 // Загрузка багажа в машинку из терминала
 async function unloadTerminal(car, flightID) {
+    await new Promise(resolve => setTimeout(resolve, luggageTimeout));
     // Машинка берёт из терминала багаж, связанный с данным конкретным рейсом
     car.luggage = luggageTerminal.filter(luggage_item => {
         luggage_item.flight_id = flightID;
@@ -155,63 +165,209 @@ async function unloadTerminal(car, flightID) {
     luggageTerminal = luggageCars.filter(luggage_item => {
         !(luggage_item.flight_id = flightID);
     });
-    console.log(`${new Date()} Машинка ${car.id} из Baggage Tractor забрала из терминала весь багаж, связанный с рейсом ${flightID}`);
+    console.log(`Машинка ${car.id} забрала из терминала весь багаж, связанный с рейсом ${flightID}`);
 }
 
 // Выгрузка багажа из машинки в терминал
-async function loadTerminal(car, flightID) {
+async function loadTerminal(car, planeID) {
+    await new Promise(resolve => setTimeout(resolve, luggageTimeout));
     // Машинка кладёт весь свой багаж в терминал)
     // await car.luggage.forEach(luggage_item => {
     //     luggageTerminal.push(luggage_item);
     // });
     // И очищается духовно
     car.luggage = [];
-    console.log(`${new Date()} Машинка ${car.id} из Baggage Tractor выгрузила в терминал весь багаж, связанный с рейсом ${flightID}`);
+    console.log(`Машинка ${car.id} выгрузила в терминал багаж, разгруженный из самолёта ${planeID}`);
 }
-
-// Принятие багажа из регистрации (очередь)
-// function acceptLuggageFromRegistration(req, res) {
-//     // Нихасю очередь... :(
-//     const luggageObj = req.body;
-//     if (luggageObj.id && luggageObj.passenger_id && luggageObj.flight_id) {
-//         luggageTerminal.push(luggageObj);
-//         res.status(200).send('');
-//         console.log(`${new Date()} Baggage Tractor принял багаж от сервиса регистрации: ${req.body}`);
-//     } else {
-//         console.log(`${new Date()} Baggage Tractor получил от регистрации неправильный багаж, поэтому проигнорирова его`);
-//         res.status(400).send('Wrong format!');
-//     }
-// }
 
 // Выгрузка багажа из машинки в самолёт
 async function loadPlane(car, planeID) {
-    await axios.post(`${planeURL}/v1/airplanes/${planeID}/luggage/load`, car.luggage, { POST_Headers })
+    await new Promise(resolve => setTimeout(resolve, luggageTimeout));
+    await axios.post(`${planeURL}/v1/airplanes/${planeID}/luggage/load`, car.luggage)
         .then(response => {
-            console.log(`Машинка ${car.id} загрузила багаж на самолёт ${planeID}, ответ: `, response);
+            console.log(`Машинка ${car.id} загрузила багаж на самолёт ${planeID}`);
             car.luggage = [];
         })
         .catch(err => {
-           console.log(`${new Date()} В процессе загрузки самолёта багажом машинкой ${planeID} возникла ошибка: `, err);
+           console.log(`В процессе загрузки самолёта ${planeID} багажом машинкой ${car.id} возникла ошибка: `, err);
         });
 }
 
 // Выгрузка багажа из самолёта в машинку
 async function unloadPlane(car, planeID) {
-    await axios.post(`${planeURL}/v1/airplanes/${planeID}/luggage/unload`, {}, { POST_Headers } )
+    await new Promise(resolve => setTimeout(resolve, luggageTimeout));
+    await axios.post(`${planeURL}/v1/airplanes/${planeID}/luggage/unload`, {})
         .then(response => {
             car.luggage = response.data;
             console.log(`Машинка ${car.id} разгрузила самолёт ${planeID}, ответ: `, response);
         })
         .catch(err => {
-            console.log(`${new Date()} В процессе разгрузки самолёта машинкой ${planeID} возникла ошибка: `, err);
+            console.log(`В процессе разгрузки самолёта машинкой ${planeID} возникла ошибка: `, err);
         });
 }
 
-// Удаление машинки из системы (зачем ?)
-async function deleteCar() {
-    await luggageCars.pop();
-    carRoutes.spawnCol--;
-    console.log(`${new Date()} Baggage Tractor какого-то хуя удалил машинку`);
+// Обработка запроса УНО (GO_PARKING)
+async function goParking(req, res) {
+    // Получаю ID самолёта из запроса
+    const planeID = req.params.plane_id;
+    let noLuggage;
+    console.log(`Получен запрос от Handling Supervisor обслужить самолёт ${planeID}`);
+
+    // Спавн и назначение машинки
+    await spawnNewCar();
+    const currentCar = await luggageCars.find(car => car.status === "ready");
+    currentCar.status = 'driving';
+
+    await res.status(200).send(currentCar.id);
+    console.log(`Запрос Handling Supervisor обслужить самолёт ${planeID} принят, машинка ${currentCar.id} отправлена`);
+
+    // Запрос типа работы у самолёта
+    console.log(`Запрос, что нужно сделать для самолёта ${planeID}`);
+    await axios.get(`${planeURL}/v1/airplanes/${planeID}/luggage`, { headers: { 'Accept': 'application/json' } })
+        .then(response => {
+            if (response.data.success === true) {
+                // Если true - загрузить; если false - разгрузить
+                if (response.data.load === true)
+                    currentCar.job.job_type = "unload";
+                else
+                    currentCar.job.job_type = "load";
+                noLuggage = (response.data.luggage.length === 0);
+            } else {
+                console.log(`Получить данные о самолёте ${planeID} от Board не получилось, причина: `, response.data);
+            }
+        })
+        .catch(error => {
+            console.error(`В процессе запроса данных о самолёте ${planeID} возникла ошибка!`, error);
+        });
+
+    // API Forget
+    // Если luggage пустой и разгрузить, то не надо разгружать
+    if (currentCar.job.job_type === "unload" && noLuggage) {
+        console.log(`Обслуживать самолёт ${planeID} не нужно, машинка ${currentCar.id} послала сигнал "forget" послан для Handling Supervisor`);
+        await axios.post(`${HSURL}/v1/car/forget/${currentCar.id}}`, {})
+            .then((response) => {
+                console.log(`Handling Supervisor успешно получил ответ об отсутствии необходимости обслуживать самолёт ${planeID} машинкой ${currentCar.id}`);
+            })
+            .catch((error) => {
+                console.error(`Во время отправки Handling Supervisor сообщения об отсутствии необходимости обслуживать самолёт ${planeID} машинкой ${currentCar.id} возникла ошибка: `, error);
+            })
+        await freeCar(currentCar);
+        return;
+    }
+
+    // Запрос координат и рейса отлёта у самолёта
+    console.log(`Второй запрос по самолёту ${planeID} у Board`);
+    await axios.get(`${planeURL}/v1/airplanes/${planeID}`, { headers: { 'Accept': 'application/json' } })
+        .then(response => {
+            if (response.data.success === true) {
+                const planeData = response.data.airplane;
+
+                const parkingSpot = parseInt(planeData.parking_spot);
+                currentCar.job.plane_row = carRoutes.parkingSpots[parkingSpot][0];
+                currentCar.job.plane_col = carRoutes.parkingSpots[parkingSpot][1];
+                currentCar.job.plane_id = planeID;
+                currentCar.job.takeoff_flight_id = planeData.voyage_b_id;
+
+                console.log(`От Board получены данные о самолёте ${planeID}`);
+            } else {
+                console.log(`Получить данные о самолёте ${planeID} от Board не получилось, причина: `, response.data);
+            }
+        })
+        .catch((err) => {
+            console.error(`В процессе запроса данных о самолёте ${planeID} возникла ошибка!`, err);
+        });
+
+    // Здесь уже начинаю движение;
+    for (let i = 0; i < 7; i++)
+        await moveCarToPoint(currentCar, carRoutes.coreCells[i][0], carRoutes.coreCells[i][1]);
+
+    // Сообщаю об этом УНО
+    currentCar.status = 'waiting';
+    console.log(`Машинка ${currentCar.id} доехала до центра площадки и послала запрос Handling Supervisor об этом`);
+    await axios.post(`${HSURL}/v1/car/here/${currentCar.id}`, {})
+        .then((response) => {
+            console.log(`Handling Supervisor успешно принял сигнал о подъезде машинки ${currentCar.id} к площадке`);
+        })
+        .catch((err) => {
+            console.error(`Во время сообщения Handling Supervisor о подъезде машинки ${currentCar.id} возникла ошибка: `,
+                            err);
+        });
+}
+
+// Отправка сигнала для УНО о завершении работы машинки
+async function sendDoneSignal(car) {
+    console.log(`Сообщение об окончании работы машинки ${car.id} послано для Handling Supervisor`);
+    await axios.post(`${HSURL}/v1/car/done/${car.id}`, {})
+        .then((response) => {
+            console.log(`Handling Supervisor успешно получил сигнал об окончании работы машинки ${car.id}`);
+            // Это по идее даже не нужно...
+            car.job.plane_id = null;
+            car.job.plane_row = null;
+            car.job.plane_col = null;
+            car.job.job_type = null;
+            car.job.takeoff_flight_id = null;
+        })
+        .catch((error) => {
+            console.error(`В процессе сообщения Handling Supervisor об окончании работы машинки ${car.id} возникла ошибка: `, error);
+        });
+}
+
+// Обработка запроса УНО (DO_ACTION)
+async function doAction(req, res) {
+    const carID = req.params.car_id;
+    console.log(`Получен запрос "do_action" от Handling Supervisor для машинки ${carID}`);
+
+    const currentCar = await luggageCars.find(car => car.id === carID);
+    // Зачем? Такое возможно вообще?
+    // if (currentCar.status !== 'waiting') {
+    //     res.status(400).send('Car is not at the parking zone!');
+    //     return;
+    // }
+
+    await res.status(200).send("");
+
+    currentCar.status = 'driving';
+    // Если самолётик надо разгрузить
+    if (currentCar.job.job_type === "unload") {
+        await moveCarToPoint(currentCar, currentCar.job.plane_row, currentCar.job.plane_col);
+        await unloadPlane(currentCar, currentCar.job.plane_id);
+
+        for (let i = 7; i < 10; i++)
+            await moveCarToPoint(currentCar, carRoutes.coreCells[i][0], carRoutes.coreCells[i][1]);
+
+        for (let i = 1; i < 3; i++)
+            await moveCarToPoint(currentCar, carRoutes.coreCells[i][0], carRoutes.coreCells[i][1]);
+
+        await loadTerminal(currentCar, currentCar.job.plane_id);
+        await sendDoneSignal(currentCar);
+
+        for (let i = 3; i < 5; i++)
+            await moveCarToPoint(currentCar, carRoutes.coreCells[i][0], carRoutes.coreCells[i][1]);
+
+        for (let i = 8; i < 11; i++)
+            await moveCarToPoint(currentCar, carRoutes.coreCells[i][0], carRoutes.coreCells[i][1]);
+    // Если загрузить
+    } else {
+        for (let i = 7; i < 10; i++)
+            await moveCarToPoint(currentCar, carRoutes.coreCells[i][0], carRoutes.coreCells[i][1]);
+
+        for (let i = 1; i < 3; i++)
+            await moveCarToPoint(currentCar, carRoutes.coreCells[i][0], carRoutes.coreCells[i][1]);
+
+        await unloadTerminal(currentCar, currentCar.job.takeoff_flight_id);
+
+        for (let i = 3; i < 6; i++)
+            await moveCarToPoint(currentCar, carRoutes.coreCells[i][0], carRoutes.coreCells[i][1]);
+
+        await moveCarToPoint(currentCar, currentCar.job.plane_row, currentCar.job.plane_col);
+        await loadPlane(currentCar, currentCar.job.plane_id);
+        await sendDoneSignal(currentCar);
+
+        for (let i = 7; i < 11; i++)
+            await moveCarToPoint(currentCar, carRoutes.coreCells[i][0], carRoutes.coreCells[i][1]);
+    }
+
+    await freeCar(currentCar);
 }
 
 // Ответка на запрос о машинках
@@ -233,174 +389,45 @@ async function handleVisuals(req, res) {
     });
 
     res.status(200).send(result);
-    // console.log(`${new Date()} Baggage Tractor отправил данные о машинках визуализатору`);
+    // console.log(`Отправлены данные визуализатору`);
 }
 
-
-// Обработка запроса УНО
-async function handleHSRequest(req, res) {
-    const planeID = req.params.id;
-    console.log(`${new Date()} Baggage Tractor получил запрос от Handling Supervisor обслужить самолёт ${planeID}`);
-
-    let planeRow;
-    let planeCol;
-    let takeOffFlightID;
-
-    // Здесь запрашиваю данные по самолёту
-    console.log(`${new Date()} Baggage Tractor запрашивает данные по рейсу ${planeID} у микросервиса Board`);
-    await axios.get(`${planeURL}/v1/airplane/${planeID}`, { headers: { 'Accept': 'application/json' } })
-        .then(response => {
-            const planeData = response.data.airplane;
-            const parkingSpot = parseInt(planeData.parking_spot);
-
-            // Получение координат парковки самолёта
-            planeRow = carRoutes.parkingSpots[parkingSpot[0]];
-            planeCol = carRoutes.parkingSpots[parkingSpot[1]];
-            takeOffFlightID = planeData.voyage_b_id;
-
-            console.log(`${getTimestamp()} Baggage Tractor получил от микросервиса Board данные о самолёте ${planeID}`);
-        })
-        .catch((err) => {
-            console.error(`${getTimestamp()} В процессе запроса данных о самолёте ${flightID} возникла ошибка!`, err);
-        });
-
-    // Нахождение индекса ближайшей к выездной точке машинки
-    let nearestCarIndex;
-    let maxCol = -1;
-    for (let i = 0; i < luggageCars.length; i++) {
-        if ((luggageCars[i].position.col > maxCol) && (luggageCars[i].status === 'ready')) {
-            maxCol = luggageCars[i].position.col;
-            nearestCarID = luggageCars[i].id;
-            nearestCarIndex = i;
-        }
-    }
-
-    // Если свободных машинок нет
-    if (maxCol === -1) {
-        console.log(`${getTimestamp()} Baggage Tractor не имеет свободных машинок и сообщает об этом Handling Supervisor`);
-        res.status(400).send('No free cars!');
-    } else {
-        const currentCar = luggageCars[nearestCarIndex];
-        currentCar.status = 'busy';
-        currentCar.job.plane_id = planeID;
-        currentCar.job.plane_row = planeRow;
-        currentCar.job.plane_col = planeCol;
-
-        // Отправляю ответ УНО
-        res.status(200).send(currentCar.id);
-        console.log(`${getTimestamp()} Baggage Tractor принял запрос от УНО обслужить самолёт ${planeID} и отправил машинку ${currentCar.id} работать`);
-
-        // Здесь уже начинаю движение
-        // Тачка едет до точки отъезда и по первым двум дорожкам
-        await moveCarToPointUnrouted(currentCar, carRoutes.dispatchRow, carRoutes.dispatchCol);
-        await moveCarThroughRoute(currentCar, carRoutes.road_1);
-        await moveCarThroughRoute(currentCar, carRoutes.road_2);
-        await moveCarThroughRoute(currentCar, carRoutes.road_3);
-
-        // Дальше крадется до середины площадки
-        await moveCarToPointUnrouted(currentCar, carRoutes.planeZoneRow, carRoutes.planeZoneCol);
-
-        // Сообщаю об этом УНО
-        console.log(`${new Data()} Машинка ${currentCar.id} доехала до центра площадки и послала запрос УНО об этом`)
-        await axios.post(`${HSURL}/v1/car/here/${currentCar.id}`, {}, { POST_Headers })
-            .then((response) => {
-                console.log(`${new Data()} УНО успешно принял сигнал о подъезде машинки ${currentCar.id} к площадке`);
-            })
-            .catch((err) => {
-                console.error(`${new Data()} Во время сообщения УНО о подъезде машинки ${currentCar.id} возникла ошибка!`);
-            });
-
+function changeSpeed(req, res) {
+    let reqTimeout = req.params.timeout;
+    console.log(`Получен запрос на смену скорости симуляции на ${reqTimeout}`);
+    try {
+        reqTimeout = req.params.timeout;
+        eventTimeout = reqTimeout;
+        console.log(`Скорость симуляции успешно сменена на ${reqTimeout}`);
+        res.status(200).send("");
+    } catch(err) {
+        console.log(`В процессе смены скорости симуляции на ${reqTimeout} возникла ошибка!`);
+        res.status(400).send("");
     }
 }
 
-async function goHome(car) {
-    // Дальше снова до центра площадки
-    await moveCarToPointUnrouted(car, carRoutes.planeZoneRow, carRoutes.planeZoneCol);
-    // Дальше крадётся до точки выезда
-    await moveCarToPointUnrouted(car, carRoutes.returnRow, carRoutes.returnCol);
-
-    // Едет домой
-    await moveCarThroughRoute(car, carRoutes.road_4);
-    await moveCarThroughRoute(car, carRoutes.road_5);
-    await moveCarThroughRoute(car, carRoutes.road_6);
-
-    // И садится жопой на своё место.
-    await moveCarToPointUnrouted(car, car.home.row, car.home.col);
-    car.status = 'ready';
-    car.job.plane_id = null;
-    car.job.plane_row = null;
-    car.job.plane_col = null;
-}
-
-// Выполнение функционала с самолётом
-async function doAction(req, res) {
-    const carID = req.params.id;
-    console.log(`${new Date()} Baggage Tractor получил запрос do-action для машинки ${carID}`);
-
-    const currentCar = luggageCars[await findIndexWithKey(carID)];
-
-    const planeID = currentCar.job.plane_id;
-    const planeRow = currentCar.job.plane_row;
-    const planeCol = currentCar.job.plane_col;
-
-    // Потом к самому самолёту
-    await moveCarToPointUnrouted(currentCar, planeRow, planeCol);
-    // Разгружает самолёт
-    await unloadPlane(currentCar, planeID);
-
-    // Дальше снова до центра площадки
-    await moveCarToPointUnrouted(currentCar, carRoutes.planeZoneRow, carRoutes.planeZoneCol);
-    // Дальше крадётся до точки выезда
-    await moveCarToPointUnrouted(currentCar, carRoutes.returnRow, carRoutes.returnCol);
-
-    await moveCarThroughRoute(currentCar, carRoutes.road_4);
-    await moveCarThroughRoute(currentCar, carRoutes.road_5);
-    await moveCarThroughRoute(currentCar, carRoutes.road_7);
-    await moveCarThroughRoute(currentCar, carRoutes.road_2);
-
-    // Выгрузка багажа
-    await loadTerminal(currentCar);
-    // Загрузка багажа на следующий рейс
-    await unloadTerminal(currentCar, takeOffFlightID);
-
-    await moveCarThroughRoute(currentCar, carRoutes.road_3);
-
-    // Дальше опять крадется до середины площадки
-    await moveCarToPointUnrouted(currentCar, carRoutes.planeZoneRow, carRoutes.planeZoneCol);
-    // Потом к самому самолёту
-    await moveCarToPointUnrouted(currentCar, planeRow, planeCol);
-
-    // Загружаю его
-    await loadPlane(currentCar, planeID);
-
-    console.log(`${new Date()} Baggage Tractor сообщил Handling Supervisor об окончании работы ${carID}`);
-    await axios.post(`${HSURL}/v1/car/done/${carID}`, {}, {POST_Headers})
-        .then((response) => {
-            console.log(`${new Date()} Handling Supervisor успешно получил сигнал об окончании работы машинки ${carID}`);
-        })
-        .catch((error) => {
-            console.error(`${new Date} В процессе сообщения микросервису Handling Supervisor об окончании работы машинки ${carID} возникла ошибка: `, error);
-        });
-
-    // Возвращаюсь домой машинкой
-    await goHome(currentCar);
-}
-
-// function changeSpeed(req, res) {
-//     let reqTimeout;
-//     try {
-//         reqTimeout = req.params.timeout;
-//         eventTimeout = reqTimeout;
-//         console.log(`${new Date()} Baggage Tractor сменил скорость симуляции`);
-//     } catch(err) {
-//         console.log(`${new Date()} В процессе смены скорости симуляции возникла ошибка!`);
-//     }
+// function debugGetCarts(req, res) {
+//     res.status(200).send(luggageCars);
+// }
+//
+// function debugGetLuggage(req, res) {
+//     res.status(200).send(luggageTerminal);
+// }
+//
+// function debugPostLuggage(req, res) {
+//     const luggageItem = req.body;
+//     console.log(`Получен новый багаж: `, luggageItem);
+//     luggageTerminal.push(luggageItem);
 // }
 
 module.exports = {
     luggageTerminal,
     spawnNewCar,
     handleVisuals,
-    handleHSRequest,
+    goParking,
     doAction,
+    changeSpeed,
+    // debugGetCarts,
+    // debugGetLuggage,
+    // debugPostLuggage,
 }

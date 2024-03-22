@@ -1,0 +1,7 @@
+// TODO: это вряд ли нужно
+// Если рядом с поданной машинкой есть другая моя машинка
+// function thereAreMyCarsNearTheCar(car) {
+//     return luggageCars.some(other_car => {
+//        return (Math.abs(car.position.row - other_car.position.row === 1) || Math.abs(car.position.col - other_car.position.col === 1));
+//     });
+// }

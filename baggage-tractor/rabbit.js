@@ -10,20 +10,19 @@ async function startRabbit() {
         const channel = await connection.createChannel();
 
         const queue = 'RegistrationToBaggage';
-        // { durable: false }
         await channel.assertQueue(queue, { durable: false });
-        await channel.bindQueue(queue, 'PassengersExchange', 'RegistrationToBaggageKey')
-        console.log(`${new Date()} Микросервис Baggage Tractor проинициализировал очередь и ждёт поступления багажа...`);
+        await channel.bindQueue(queue, 'PassengersExchange', rabbitKey)
+        console.log(`Проинициализирована очередь, ожидается поступление багажа...`);
 
         channel.consume(queue, (message) => {
             if (message !== null) {
                 const jsonData = JSON.parse(message.content.toString());
-                console.log(`${new Date()} Baggage Tractor получил новый багаж из очереди: `, jsonData);
+                console.log(`Получен новый багаж из очереди: `, jsonData);
 
                 // Добавление поступившего багажа в терминал
                 utils.luggageTerminal.push({
-                    passenger_id: jsonData.Voyage,
-                    flight_id: jsonData.Passenger
+                    passenger_id: jsonData.Passenger,
+                    flight_id: jsonData.Voyage
                 });
 
                 channel.sendToQueue(message.properties.replyTo, Buffer.from('Success'), {
@@ -33,7 +32,7 @@ async function startRabbit() {
             }
         });
     } catch (error) {
-        console.error(`${new Date()} Ошибка в очереди: `, error);
+        console.error(`Ошибка в очереди: `, error);
     }
 }
 
