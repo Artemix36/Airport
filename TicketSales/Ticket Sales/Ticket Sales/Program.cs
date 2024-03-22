@@ -64,7 +64,8 @@ namespace Ticket_Sales
 
                         if (can_seat)
                         {
-                            MQ.SendMessage($"Passenger:{passenger_GUID};Flight:{flight_GUID}Ticket:yes;");
+                            MQ.SendMessage($"{{\r\n\"Passenger\":\"{passenger_GUID}\",\r\n\"Flight\":\"{flight_GUID}\"\r\n}}");
+                            MQ.SendResponseMessage($"{{\r\n\"Passenger\":\"{passenger_GUID}\",\r\n\"Ticket\":\"1\"\r\n}}");
                         }
 
                         Console.WriteLine($"Обработано обращение от {passenger_GUID}. Билет: {can_seat}");

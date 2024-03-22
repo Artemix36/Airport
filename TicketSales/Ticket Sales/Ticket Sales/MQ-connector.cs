@@ -16,7 +16,7 @@ namespace Ticket_Sales
 
         static string exchangeName = "PassengersExchange";
         static string ReadQueueName = "TicketsRequest";
-        static string WriteQueueName = "TicketsResponse";
+        static string WriteQueueName = "TicketsToRegistration";
 
         static ConnectionFactory factory = new ConnectionFactory
         {
@@ -24,9 +24,11 @@ namespace Ticket_Sales
             HostName = "hawk-01.rmq.cloudamqp.com",
             Password = "DEL8js4Cg76jY_2lAt19CjfY2saZT0yW",
             UserName = "itojxdln",
-            ClientProvidedName = "Passenger Generator"
+            ClientProvidedName = "Ticket Sales"
         };
+
         static IConnection conn = factory.CreateConnection();
+        static IModel model1 = conn.CreateModel();
         static string routingKey = "passengers-routing-key";
 
         public void QueueListen()
@@ -60,20 +62,21 @@ namespace Ticket_Sales
             Console.WriteLine("Соединение закрыто. See you, space cowboy!");
         }
 
-        private IModel GetRabbitChannel(string queue)
+        public IModel GetRabbitChannel(string queue)
         {
-            if (conn != null)
-            {
-                IModel model = conn.CreateModel();
-                model.ExchangeDeclare(exchangeName, ExchangeType.Direct);
-                model.QueueDeclare(queue, false, false, false, null);
-                model.QueueBind(queue, exchangeName, queue+"Key", null);
-                return model;
-            }
-            else
-            {
-                return null;
-            }
+                if (conn != null)
+                {
+                    IModel model = conn.CreateModel();
+                    model.ExchangeDeclare(exchangeName, ExchangeType.Direct);
+                    model.QueueDeclare(queue, false, false, false, null);
+                    model.QueueBind(queue, exchangeName, queue + "Key", null);
+                    return model;
+                }
+                else
+                {
+                    Console.WriteLine("null");
+                    return null;
+                }
         }
 
         public void SendMessage(string message)
@@ -90,22 +93,47 @@ namespace Ticket_Sales
             }
         }
 
-        public string ReceiveIndividualMessage()
+        public void SendResponseMessage(string message)
         {
-            string originalMessage = "";
-            IModel model = GetRabbitChannel(ReadQueueName);
-            BasicGetResult result = model.BasicGet(ReadQueueName, true);
-
-            if (result == null)
+            IModel model = GetRabbitChannel("TicketsResponse");
+            if (model != null)
             {
-                return null;
+                byte[] messageBodyBytes = Encoding.UTF8.GetBytes(message);
+                model.BasicPublish(exchangeName, "TicketsResponse" + "Key", null, messageBodyBytes);
             }
             else
             {
-                byte[] body = result.Body.ToArray();
-                originalMessage = Encoding.UTF8.GetString(body);
-                return originalMessage;
+                Console.WriteLine("Невозможно отправить сообщение");
             }
+        }
+
+        public string ReceiveIndividualMessage()
+        {
+            string originalMessage = "";
+            //try
+            //{
+
+            IModel model = GetRabbitChannel(ReadQueueName);
+            BasicGetResult result = model.BasicGet(ReadQueueName, true);
+
+                if (result == null)
+                {
+                    Console.WriteLine("Очередь пустая");
+                    return null;
+                }
+                else
+                {
+                    byte[] body = result.Body.ToArray();
+                    originalMessage = Encoding.UTF8.GetString(body);
+                    return originalMessage;
+                }
+
+            //}
+            //catch (Exception ex)
+            //{
+            //    Console.WriteLine(ex.Message);
+            //    return null;
+            //}
         }
     }
 }

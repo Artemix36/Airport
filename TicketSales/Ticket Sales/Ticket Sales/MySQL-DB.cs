@@ -65,6 +65,7 @@ namespace Ticket_Sales
 
         internal void FillSeats()
         {
+            Console.WriteLine("Updating Flights");
             var client = new HttpClient();
             try
             {
@@ -151,10 +152,6 @@ namespace Ticket_Sales
         {
             MySQL_DB db = new MySQL_DB();
             db.OpenConnect();
-            //MySqlCommand cmd = new MySqlCommand($"INSERT INTO `Flights` (`FLIGHT_GUID`, `FREE_SEATS`) VALUES(@n, @a)", db.GetConnection());
-            //cmd.Parameters.Add("@n", MySqlDbType.VarChar).Value = info_passenger[0].Split(':')[2].Trim('"');
-            //cmd.Parameters.Add("@a", MySqlDbType.VarChar).Value = info_passenger[8].Split(':')[1].Trim('"', '}');
-            //cmd.ExecuteNonQuery();
 
             for (int i = 0; i < info_passenger.Length; i++)
             {
@@ -169,10 +166,18 @@ namespace Ticket_Sales
                     }
                     catch (Exception ex) 
                     {
-                        Console.WriteLine("ERROR: "+ex.Message);
+                        if(ex.Message.Contains("Duplicate entry"))
+                        {
+
+                        }
+                        else
+                        {
+                            Console.WriteLine("ERROR: " + ex.Message);
+                        }
                     }
                     }
             }
+            Console.WriteLine("Updated");
             db.CloseConnect();
         }
 
