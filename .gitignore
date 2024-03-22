@@ -13,6 +13,7 @@ TicketSales/Ticket Sales/.vs/Ticket Sales/v17/.suo
 *.cache
 *.pdb
 *.json
+/baggage-tractor/node-modules/
 /TicketSales/Ticket Sales/.vs/ProjectEvaluation/ticket sales.metadata.v7.bin
 /TicketSales/Ticket Sales/.vs/ProjectEvaluation/ticket sales.projects.v7.bin
 /TicketSales/Ticket Sales/.vs/Ticket Sales/DesignTimeBuild/.dtbcache.v2
